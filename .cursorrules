@@ -1,0 +1,452 @@
+# Cursor Rules - Comprehensive Development Guidelines
+
+This file contains all development rules and premises for this project. Follow these guidelines strictly when writing, reviewing, or refactoring code.
+
+---
+
+## 1. ARCHITECTURE FOUNDATION
+
+### Technology Stack
+- **Frontend (Web)**: React.js + Next.js (App Router), TypeScript throughout
+- **Frontend (Mobile)**: Expo React Native (managed workflow, no ejecting), TypeScript throughout
+- **Routing**: Expo Router for file-based routing (mobile), Next.js App Router (web)
+- **Data Fetching**: TanStack Query (React Query) for server state management
+- **State Management**: Zustand for persistent client state, React Context for global UI state
+- **Styling**: Tailwind CSS + shadcn/ui (web), React Native StyleSheet (mobile)
+- **API**: Reuse existing Next.js API endpoints (`/api/v1` prefix), no new backend needed
+
+### Layered Data Flow
+Always follow this pattern: **Screen → Component → Hook → Service → Endpoint → Data**
+
+Each layer has a specific responsibility and communicates only with adjacent layers:
+- **Screen**: Route/page entry point, minimal logic
+- **Component**: UI presentation, receives data via props
+- **Hook**: Business logic, data fetching coordination
+- **Service**: API calls, data transformations
+- **Endpoint**: Backend API route
+- **Data**: Database/storage
+
+---
+
+## 2. FOLDER STRUCTURE & ORGANIZATION
+
+### Feature-Based Architecture
+- Features are **autonomous and self-contained**
+- **No direct imports between features** - use shared code in `/shared/` instead
+- Each feature follows consistent structure:
+  ```
+  /features/[feature-name]/
+    ├── components/     # Feature-specific UI components
+    ├── hooks/         # Feature-specific React hooks
+    ├── services/      # Feature-specific business logic
+    ├── types/         # Feature-specific TypeScript types
+    ├── utils/         # Feature-specific utilities
+    ├── constants/     # Feature-specific constants
+    └── index.ts       # Barrel exports for clean imports
+  ```
+
+### Shared Code Organization
+- Common code lives in `/shared/` (components, hooks, services, types, utils, constants, providers)
+- Web-specific: `/app/`, `/components/`, `/hooks/`, `/lib/`, `/docs/`
+- Mobile-specific: `/app/` (Expo Router screens)
+- Components organized by business functionality: `/components/[feature-name]/`
+- Shared UI components: `/components/ui/` (web) or `/shared/components/ui/` (mobile)
+- Use barrel exports (`index.ts`) for clean imports
+
+### File Naming Conventions
+- **Components**: PascalCase (e.g., `UserProfile.tsx`)
+- **Hooks**: camelCase with `use` prefix (e.g., `useUserData.ts`)
+- **Services**: camelCase (e.g., `userService.ts`)
+- **Types**: PascalCase (e.g., `UserTypes.ts`)
+- **Utils**: camelCase (e.g., `formatDate.ts`)
+- **Constants**: UPPER_SNAKE_CASE (e.g., `API_ENDPOINTS.ts`)
+
+---
+
+## 3. MAINTAINABILITY & REUSABILITY
+
+### DRY Principle
+- **No duplication** across modules - extract shared utilities
+- Module decoupling: components are generic and reusable
+- No hardcoded module-specific logic in shared components
+- Shared components in `components/common/` or `/shared/components/` with configuration objects
+
+### Component Reusability
+- Components must be generic and configurable via props
+- Use configuration objects for behavior customization
+- Avoid hardcoding business logic in UI components
+- Prefer composition over inheritance
+
+---
+
+## 4. SOLID ARCHITECTURE PRINCIPLES
+
+### Dependency Injection
+- All services accessed via `serviceContainer` - no direct instantiation
+- Interface-based design: depend on abstractions (interfaces), not concrete implementations
+- Single responsibility: each service/component has one clear purpose
+
+### Service Container Pattern
+```typescript
+// ✅ Correct: Access via service container
+const userService = serviceContainer.get<IUserService>('userService');
+
+// ❌ Wrong: Direct instantiation
+const userService = new UserService();
+```
+
+---
+
+## 5. TYPE SAFETY & RELIABILITY
+
+### TypeScript Best Practices
+- **TypeScript throughout** - no `any` types without justification
+- Use union types for constrained values instead of literal strings
+- Explicit type definitions for all props, functions, and data structures
+- Type all API responses and request bodies
+
+### Error Handling
+- **Always check** loading, error, and data existence before rendering
+- Use error boundaries to wrap critical components and prevent crashes
+- Global error handler: `useGlobalErrorHandler` for all error management
+- Automatic toast notifications for CRUD operations
+- Centralized logging: use `logger` from `@/lib/logger` (never `console.log`)
+- Error boundaries for React component errors
+
+### Data Validation
+- Explicit null/undefined checks before accessing data
+- Use Zod for schema validation in forms and API responses
+- Validate all user inputs and API responses
+
+---
+
+## 6. STATE MANAGEMENT
+
+### State Management Strategy
+Follow this clear separation:
+
+1. **Server State** → TanStack Query (React Query)
+   - API data, caching, background refetching
+   - Centralized query keys: `['entity', 'action', params]` in `src/lib/queryKeys.ts`
+   - Optimistic updates with query invalidation
+
+2. **Persistent Client State** → Zustand
+   - User preferences, selected project, theme
+   - Settings that persist across sessions
+
+3. **UI-only State** → `useState`
+   - Form inputs, modal visibility, temporary UI state
+
+4. **URL State** → Query parameters
+   - Filters, pagination, search terms
+   - Persist filters in URL query params
+
+5. **Local Storage** → `localStorage` / AsyncStorage
+   - User preferences, cached data
+
+### Query Key Management
+- All query keys centralized in `src/lib/queryKeys.ts`
+- Format: `['entity', 'action', params]`
+- Use consistent naming across the application
+
+---
+
+## 7. PERFORMANCE OPTIMIZATION
+
+### React Performance
+- **Memoization**: Shared/reusable components must use `React.memo()`
+- Use `useMemo()` for expensive computations
+- Use `useCallback()` for functions passed as props
+- Virtualization: use optimized lists (e.g., `FlatList` in React Native, `react-window` in web) for large datasets
+- Lazy loading: render charts and heavy components only when screens are focused
+- Code splitting: use dynamic imports for route-based splitting
+
+### Memory Management
+- Cleanup event listeners, intervals, and timeouts in `useEffect` cleanup functions
+- Unsubscribe from subscriptions and observers
+- Avoid memory leaks with proper cleanup
+
+### Mobile-First Performance
+- Optimize for mobile: performance, memory, and UX are prioritized
+- Use responsive design with hooks for orientation/screen changes, not static dimensions
+- Prefer native patterns: bottom sheets, gestures, and mobile-optimized interactions
+
+---
+
+## 8. UI & STYLING
+
+### Web Styling
+- **Tailwind CSS + shadcn/ui** - avoid inline styles
+- Mobile-first responsive design
+- Dark mode support
+- Next.js `<Image>` component for images (with proper optimization)
+- JSX: special characters (apostrophes/quotes) can be used directly
+
+### Mobile Styling
+- React Native StyleSheet for styling
+- Use responsive hooks for screen size and orientation
+- Native components and patterns (bottom sheets, gestures)
+- Platform-specific styling when needed
+
+### Accessibility
+- Support font scaling and screen readers
+- Proper ARIA labels and semantic HTML
+- Keyboard navigation support
+- WCAG compliance
+- Test with accessibility tools
+
+---
+
+## 9. FORMS & VALIDATION
+
+### Form Management
+- **React Hook Form** for form management
+- **Zod** for schema validation
+- shadcn/ui form components (web)
+- Real-time validation feedback
+- Add Dialog Pattern: reuse layout from `docs/patterns/add-entity-flow.md` (if exists)
+
+### Form Best Practices
+- Validate on blur and submit
+- Show clear error messages
+- Disable submit button during submission
+- Reset form after successful submission
+
+---
+
+## 10. SEARCH & FILTERING
+
+### List/Table Requirements
+- **All list/table screens must include** search + filter controls
+- Filters persisted in URL query params
+- Debounced search for performance (300ms default)
+- Clear visual feedback for active filters
+- Reset filters functionality
+
+---
+
+## 11. API INTEGRATION
+
+### API Standards
+- REST API with `/api/v1` prefix
+- Use `customFetch()` utility for all API calls
+- Request/response interceptors for common logic
+- Automatic token injection via `customFetch()`
+- Retry logic with exponential backoff
+- AbortController for request cancellation
+
+### API Error Handling
+- Consistent error response format
+- Handle network errors gracefully
+- Show user-friendly error messages
+- Log errors for debugging
+
+---
+
+## 12. USER EXPERIENCE
+
+### Feedback & Notifications
+- **Always provide feedback**: show success/error toasts after async operations
+- Use `react-hot-toast` for all notifications (web)
+- Success, error, warning, and info notification types
+- Consistent messaging across the app
+
+### Loading States
+- Use informative skeleton screens matching final layouts
+- Show loading indicators for async operations
+- Consistent loading/error/empty states across features
+- Never show blank screens during loading
+
+### Mobile UX
+- Native feel with platform-appropriate interactions
+- Gesture support where appropriate
+- Bottom sheets for mobile actions
+- Optimize touch targets (minimum 44x44 points)
+
+---
+
+## 13. CONSISTENCY ACROSS MODULES
+
+### Shared Patterns
+- All modules use the same architectural patterns
+- Generic components: charts and UI components are reusable across modules
+- Configuration-driven: module-specific behavior comes from props/config, not hardcoded logic
+- Consistent naming conventions across features
+
+### Code Patterns
+- Follow established patterns for similar functionality
+- Reuse existing components and hooks
+- Document any deviations from standard patterns
+
+---
+
+## 14. EXPO ECOSYSTEM (Mobile)
+
+### Expo Best Practices
+- **Stay within Expo**: prefer `expo-*` packages over native modules
+- File-based routing: use Expo Router conventions
+- Managed workflow: no ejecting unless absolutely necessary
+- Use Expo SDK packages for common functionality
+
+---
+
+## 15. CODE QUALITY
+
+### Testing
+- Write unit tests for all components (React Testing Library)
+- Integration tests for complex flows
+- Test critical functionality, especially data transformations
+- Tests organized by feature for clear coverage
+- Aim for high test coverage on business logic
+
+### Linting & Formatting
+- **ESLint**: legacy `.eslintrc.json` format, TypeScript files only
+- **Zero warnings policy**: fix all linting warnings
+- **Prettier**: auto-format on pre-commit via lint-staged
+- CI simulation scripts: `pnpm ci:all:fast`, `pnpm ci:lint:fast`, etc.
+
+### Documentation
+- Document overrides of default configurations
+- Comment complex business logic
+- Keep README files updated
+- Document API contracts and interfaces
+
+### Development Tools
+- React DevTools for component debugging
+- TanStack Query DevTools for data fetching debugging
+- Use TypeScript strict mode
+- Enable all relevant ESLint rules
+
+---
+
+## 16. ENVIRONMENT CONFIGURATION
+
+### Environment Variables
+- Environment variables for configuration
+- Feature flags for gradual rollouts
+- Different configs for dev/staging/prod
+- TypeScript for environment variable validation
+- Never commit secrets or API keys
+
+---
+
+## 17. PRIORITY PRINCIPLES
+
+These rules prioritize (in order):
+
+1. **Type Safety**: TypeScript everywhere, no `any` without justification
+2. **Centralization**: Query keys, error handling, logging in centralized locations
+3. **Consistency**: Patterns, naming, structure consistent across codebase
+4. **User Experience**: Loading states, error handling, accessibility
+5. **Maintainability**: Feature independence, reusable components, clear organization
+6. **Quality**: Testing, linting, formatting, zero warnings policy
+7. **Performance**: Memoization, virtualization, lazy loading, memory management
+
+---
+
+## 18. IMPLEMENTATION CHECKLIST
+
+When implementing new features or components, ensure:
+
+- [ ] Follows layered architecture (Screen → Component → Hook → Service)
+- [ ] TypeScript types defined for all props and data
+- [ ] Error handling implemented (loading, error, empty states)
+- [ ] Uses appropriate state management (Query/Zustand/useState)
+- [ ] Memoized if shared/reusable component
+- [ ] Accessible (ARIA labels, keyboard navigation)
+- [ ] Responsive design (mobile-first)
+- [ ] Tests written for critical functionality
+- [ ] No linting warnings
+- [ ] Follows naming conventions
+- [ ] Uses shared components/utilities when possible
+- [ ] No direct imports between features
+- [ ] Proper cleanup in useEffect hooks
+- [ ] User feedback for async operations
+
+---
+
+## 19. COMMON PATTERNS
+
+### Data Fetching Pattern
+```typescript
+// ✅ Correct: Using React Query with centralized query keys
+const { data, isLoading, error } = useQuery({
+  queryKey: queryKeys.users.list(filters),
+  queryFn: () => userService.getUsers(filters),
+});
+
+// Check states before rendering
+if (isLoading) return <Skeleton />;
+if (error) return <ErrorDisplay error={error} />;
+if (!data) return <EmptyState />;
+```
+
+### Component Pattern
+```typescript
+// ✅ Correct: Generic, reusable component with TypeScript
+interface UserCardProps {
+  user: User;
+  onPress?: (user: User) => void;
+}
+
+export const UserCard = React.memo<UserCardProps>(({ user, onPress }) => {
+  // Component implementation
+});
+```
+
+### Service Pattern
+```typescript
+// ✅ Correct: Service with interface, accessed via container
+interface IUserService {
+  getUsers(filters: UserFilters): Promise<User[]>;
+}
+
+class UserService implements IUserService {
+  async getUsers(filters: UserFilters): Promise<User[]> {
+    return customFetch('/api/v1/users', { params: filters });
+  }
+}
+```
+
+---
+
+## 20. ANTI-PATTERNS TO AVOID
+
+### ❌ Don't Do This
+- Direct instantiation of services (use service container)
+- `any` types without justification
+- `console.log` (use logger)
+- Direct imports between features
+- Hardcoded business logic in shared components
+- Missing error/loading states
+- Unmemoized shared components
+- Missing cleanup in useEffect
+- Inline styles (use Tailwind/StyleSheet)
+- Duplicate code across modules
+
+### ✅ Do This Instead
+- Access services via service container
+- Explicit TypeScript types
+- Use centralized logger
+- Use shared code in `/shared/`
+- Configuration-driven components
+- Always handle loading/error/empty states
+- Memoize shared components
+- Cleanup in useEffect
+- Use Tailwind CSS or StyleSheet
+- Extract shared utilities
+
+---
+
+## SUMMARY
+
+This comprehensive rule set enforces:
+- **Structured, scalable architecture** with clear separation of concerns
+- **Strong type safety** throughout the codebase
+- **Consistent patterns** across all features
+- **High code quality** with testing and linting
+- **Excellent user experience** with proper feedback and accessibility
+- **Maintainable codebase** with feature independence and reusability
+
+Follow these rules strictly to ensure code quality, maintainability, and consistency across the entire project.
+
